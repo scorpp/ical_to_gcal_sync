@@ -15,9 +15,10 @@ from dateutil.tz import gettz
 
 from datetime import datetime, timezone, timedelta
 
-from auth import auth_with_calendar_api
 from pathlib import Path
 from httplib2 import Http
+
+from .auth import auth_with_calendar_api
 
 
 logger = logging.getLogger(__name__)
@@ -162,7 +163,7 @@ class CalendarNotAvailableException(Exception):
     pass
 
 
-def main(config):
+def run_sync(config):
     mandatory_configs = ['CREDENTIAL_PATH', 'ICAL_FEEDS', 'APPLICATION_NAME']
     for mandatory in mandatory_configs:
         if not config.get(mandatory) or config[mandatory][0] == '<':
@@ -352,7 +353,7 @@ def main(config):
         logger.info('> Processing of source %s completed' % feed['source'])
 
 
-if __name__ == '__main__':
+def main():
     _config = {}
     config_path = os.environ.get('CONFIG_PATH', 'config.py')
     exec(Path(config_path).read_text(), _config)
@@ -366,7 +367,7 @@ if __name__ == '__main__':
     logger.addHandler(handler)
 
     try:
-        main(_config)
+        run_sync(_config)
     except ImproperlyConfiguredException as e:
         logger.error(str(e))
         sys.exit(1)

@@ -1,4 +1,5 @@
 from setuptools import setup
+
 setup(
     name='ical_to_gcal_sync',
     description='Basic Python script to pull events from an iCal feed and push to Google Calendar',
@@ -9,8 +10,8 @@ setup(
     license_files=['LICENSE.txt'],
     version='0.1',
     packages=['ical_to_gcal_sync'],
-    package_dir={'ical_to_gcal_sync': '.'},
-    package_data={'ical_to_gcal_sync': ['config.py.example']},
+    package_dir={'ical_to_gcal_sync': 'ical_to_gcal_sync'},
+    scripts=['ical-to-gcal-sync'],
     install_requires=open('requirements.txt').readlines(),
 
     classifiers=[
@@ -30,4 +31,3 @@ setup(
         'Programming Language:: Python:: 3.12',
     ]
 )
-
