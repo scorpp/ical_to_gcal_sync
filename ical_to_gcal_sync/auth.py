@@ -1,23 +1,15 @@
-import os
 import logging
-import sys
+import os
 
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
 logger = logging.getLogger(__name__)
 
 
 def auth_with_calendar_api(config):
-    if config.get('LOGFILE', None):
-        handler = logging.FileHandler(filename=config['LOGFILE'], mode='a')
-    else:
-        handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s|[%(levelname)s] %(message)s'))
-    logger.addHandler(handler)
-
     # this file stores your access and refresh tokens, and is
     # created automatically when the auth flow succeeeds for 
     # the first time. 
