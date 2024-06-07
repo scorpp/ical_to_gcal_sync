@@ -10,6 +10,7 @@ from google.oauth2.credentials import Credentials
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
 def auth_with_calendar_api(config):
     if config.get('LOGFILE', None):
         handler = logging.FileHandler(filename=config['LOGFILE'], mode='a')

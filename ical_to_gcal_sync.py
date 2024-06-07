@@ -19,22 +19,12 @@ from auth import auth_with_calendar_api
 from pathlib import Path
 from httplib2 import Http
 
-config = {}
-config_path=os.environ.get('CONFIG_PATH', 'config.py')
-exec(Path(config_path).read_text(), config)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-if config.get('LOGFILE', None):
-    handler = logging.FileHandler(filename=config['LOGFILE'], mode='a')
-else:
-    handler = logging.StreamHandler(sys.stderr)
-handler.setFormatter(logging.Formatter('%(asctime)s|[%(levelname)s] %(message)s'))
-logger.addHandler(handler)
-
 DEFAULT_TIMEDELTA = timedelta(days=365)
 
-def get_current_events_from_files(path):
+
+def get_current_events_from_files(path, config):
     
     """Retrieves data from iCal files.  Assumes that the files are all
     *.ics files located in a single directory.
@@ -51,11 +41,11 @@ def get_current_events_from_files(path):
     if len(event_ics) > 0:
         ics = event_ics[0]
         logger.debug('> Loading file {}'.format(ics))
-        cal = get_current_events(feed_url_or_path=ics, files=True)
+        cal = get_current_events(feed_url_or_path=ics, files=True, config=config)
         logger.debug('> Found {} new events'.format(len(cal)))
         for ics in event_ics[1:]:
             logger.debug('> Loading file {}'.format(ics))
-            evt = get_current_events(feed_url_or_path=ics, files=True)
+            evt = get_current_events(feed_url_or_path=ics, files=True, config=config)
             if len(evt) > 0:
                 cal.extend(evt)
             logger.debug('> Found {} new events'.format(len(evt)))
@@ -63,7 +53,8 @@ def get_current_events_from_files(path):
     else:
         return None
 
-def get_current_events(feed_url_or_path, files):
+
+def get_current_events(feed_url_or_path, files, config):
     """Retrieves data from an iCal feed and returns a list of icalevents
     Event objects
 
@@ -95,6 +86,7 @@ def get_current_events(feed_url_or_path, files):
         return None
 
     return cal
+
 
 def get_gcal_events(calendar_id, service, from_time=None):
     """Retrieves the current set of Google Calendar events from the selected
@@ -138,12 +130,15 @@ def get_gcal_events(calendar_id, service, from_time=None):
     logger.info('> Found {:d} upcoming events in Google Calendar (multi page)'.format(len(events)))
     return events
 
+
 def get_gcal_datetime(py_datetime, gcal_timezone):
     py_datetime = py_datetime.astimezone(gettz(gcal_timezone))
     return {u'dateTime': py_datetime.strftime('%Y-%m-%dT%H:%M:%S%z'), 'timeZone': gcal_timezone}
 
+
 def get_gcal_date(py_datetime):
     return {u'date': py_datetime.strftime('%Y-%m-%d')}
+
 
 def create_id(uid, begintime, endtime, prefix=''):
     """ Converts ical UUID, begin and endtime to a valid Gcal ID
@@ -158,12 +153,20 @@ def create_id(uid, begintime, endtime, prefix=''):
     allowed_chars = string.ascii_lowercase[:22] + string.digits
     return prefix + re.sub('[^{}]'.format(allowed_chars), '', uid.lower()) + str(arrow.get(begintime).int_timestamp) + str(arrow.get(endtime).int_timestamp)
 
-if __name__ == '__main__':
+
+class ImproperlyConfiguredException(Exception):
+    pass
+
+
+class CalendarNotAvailableException(Exception):
+    pass
+
+
+def main(config):
     mandatory_configs = ['CREDENTIAL_PATH', 'ICAL_FEEDS', 'APPLICATION_NAME']
     for mandatory in mandatory_configs:
         if not config.get(mandatory) or config[mandatory][0] == '<':
-            logger.error("Must specify a non-blank value for %s in the config file" % mandatory)
-            sys.exit(1)
+            raise ImproperlyConfiguredException("Must specify a non-blank value for %s in the config file" % mandatory)
 
     # setting up Google Calendar API for use
     logger.debug('> Loading credentials')
@@ -182,13 +185,13 @@ if __name__ == '__main__':
         # retrieve events from the iCal feed
         if feed['files']:
             logger.info('> Retrieving events from local folder')
-            ical_cal = get_current_events_from_files(feed['source'])
+            ical_cal = get_current_events_from_files(feed['source'], config=config)
         else:
             logger.info('> Retrieving events from iCal feed')
-            ical_cal = get_current_events(feed_url_or_path=feed['source'], files=False)
+            ical_cal = get_current_events(feed_url_or_path=feed['source'], files=False, config=config)
 
         if ical_cal is None:
-            sys.exit(-1)
+            raise CalendarNotAvailableException(feed['source'])
 
         # convert iCal event list into a dict indexed by (converted) iCal UID
         ical_events = {}
@@ -347,3 +350,25 @@ if __name__ == '__main__':
                         logger.error("Error updating: %s (%s)" % (gcal_event['id'], ex))
 
         logger.info('> Processing of source %s completed' % feed['source'])
+
+
+if __name__ == '__main__':
+    _config = {}
+    config_path = os.environ.get('CONFIG_PATH', 'config.py')
+    exec(Path(config_path).read_text(), _config)
+
+    logger.setLevel(logging.DEBUG)
+    if _config.get('LOGFILE', None):
+        handler = logging.FileHandler(filename=_config['LOGFILE'], mode='a')
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter('%(asctime)s|[%(levelname)s] %(message)s'))
+    logger.addHandler(handler)
+
+    try:
+        main(_config)
+    except ImproperlyConfiguredException as e:
+        logger.error(str(e))
+        sys.exit(1)
+    except CalendarNotAvailableException:
+        sys.exit(-1)
